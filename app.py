@@ -36,7 +36,8 @@ Upload a fruit image and let **MobileNetV2** identify it.
 def load_model():
 
     model = tf.keras.models.load_model(
-        "fruits360_mobilenetv2_final.keras"
+        "fruits360_mobilenetv2_final.keras",
+        compile=False
     )
 
     return model
@@ -54,17 +55,19 @@ def load_classes():
     with open("class_indices.json", "r") as f:
         class_indices = json.load(f)
 
-    return {v: k for k, v in class_indices.items()}
+    # Convert index -> class name
+    return {int(v): k for k, v in class_indices.items()}
 
 
 idx_to_class = load_classes()
 
 
-# Automatically detect model input size
-IMG_SIZE = (
-    model.input.shape[1],
-    model.input.shape[2]
-)
+# -----------------------------
+# Image Size
+# -----------------------------
+# Same size used during training
+IMG_SIZE = (64, 64)
+
 
 
 # -----------------------------
@@ -74,9 +77,7 @@ def preprocess(image):
 
     image = image.convert("RGB")
 
-    image = image.resize(
-        IMG_SIZE
-    )
+    image = image.resize(IMG_SIZE)
 
     img = np.array(image).astype(
         np.float32
@@ -116,6 +117,7 @@ with st.sidebar:
     )
 
 
+
 # -----------------------------
 # Upload Image
 # -----------------------------
@@ -150,9 +152,7 @@ if uploaded is not None:
 
         with st.spinner("Predicting..."):
 
-
             img = preprocess(image)
-
 
             prediction = model.predict(
                 img,
@@ -165,14 +165,14 @@ if uploaded is not None:
         )
 
 
-        pred_class = idx_to_class[
-            pred_index
-        ]
+        pred_class = idx_to_class.get(
+            pred_index,
+            "Unknown"
+        )
 
 
         confidence = (
-            prediction[pred_index]
-            * 100
+            prediction[pred_index] * 100
         )
 
 
@@ -211,7 +211,7 @@ if uploaded is not None:
     for i in top5:
 
         st.write(
-            f"### {idx_to_class[i]}"
+            f"### {idx_to_class.get(i,'Unknown')}"
         )
 
         st.progress(
