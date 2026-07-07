@@ -2,7 +2,9 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 import json
+
 from PIL import Image
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 
 # -----------------------------
@@ -55,7 +57,7 @@ def load_classes():
     with open("class_indices.json", "r") as f:
         class_indices = json.load(f)
 
-    # Convert index -> class name
+    # Convert class name -> index into index -> class name
     return {int(v): k for k, v in class_indices.items()}
 
 
@@ -65,9 +67,7 @@ idx_to_class = load_classes()
 # -----------------------------
 # Image Size
 # -----------------------------
-# Same size used during training
 IMG_SIZE = (64, 64)
-
 
 
 # -----------------------------
@@ -79,11 +79,10 @@ def preprocess(image):
 
     image = image.resize(IMG_SIZE)
 
-    img = np.array(image).astype(
-        np.float32
-    )
+    img = np.array(image).astype(np.float32)
 
-    img = img / 255.0
+    # MobileNetV2 preprocessing
+    img = preprocess_input(img)
 
     img = np.expand_dims(
         img,
@@ -113,7 +112,7 @@ with st.sidebar:
     )
 
     st.write(
-        "Test Accuracy : 92.78%"
+        "Validation Accuracy : 92.78%"
     )
 
 
@@ -160,20 +159,16 @@ if uploaded is not None:
             )[0]
 
 
-        pred_index = np.argmax(
-            prediction
-        )
+        pred_index = np.argmax(prediction)
 
 
         pred_class = idx_to_class.get(
-            pred_index,
+            int(pred_index),
             "Unknown"
         )
 
 
-        confidence = (
-            prediction[pred_index] * 100
-        )
+        confidence = prediction[pred_index] * 100
 
 
         st.success(
@@ -187,10 +182,14 @@ if uploaded is not None:
         )
 
 
-        st.progress(
-            float(
-                prediction[pred_index]
+        if confidence < 70:
+            st.warning(
+                "Low confidence. Try a clearer fruit image."
             )
+
+
+        st.progress(
+            float(prediction[pred_index])
         )
 
 
@@ -211,13 +210,11 @@ if uploaded is not None:
     for i in top5:
 
         st.write(
-            f"### {idx_to_class.get(i,'Unknown')}"
+            f"### {idx_to_class.get(int(i),'Unknown')}"
         )
 
         st.progress(
-            float(
-                prediction[i]
-            )
+            float(prediction[i])
         )
 
         st.write(
