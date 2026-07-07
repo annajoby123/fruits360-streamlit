@@ -8,89 +8,144 @@ from PIL import Image
 # Page Configuration
 # -----------------------------
 st.set_page_config(
-    page_title="Fruit Classifier",
+    page_title="Fruits360 Classifier",
     page_icon="🍎",
-    layout="centered"
+    layout="wide"
 )
 
+# -----------------------------
+# Title
+# -----------------------------
 st.title("🍎 Fruits360 Image Classifier")
-st.write("Upload a fruit image and the MobileNetV2 model will predict its class.")
+st.markdown(
+    """
+Upload a fruit image and let **MobileNetV2** identify it.
+
+**Model:** MobileNetV2 (Transfer Learning)
+"""
+)
 
 # -----------------------------
 # Load Model
 # -----------------------------
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("fruits360_mobilenetv2_final.keras")
+    return tf.keras.models.load_model(
+        "fruits360_mobilenetv2_final.keras"
+    )
 
 model = load_model()
 
 # -----------------------------
 # Load Class Labels
 # -----------------------------
-with open("class_indices.json", "r") as f:
-    class_indices = json.load(f)
+@st.cache_data
+def load_classes():
 
-idx_to_class = {v: k for k, v in class_indices.items()}
+    with open("class_indices.json") as f:
+        class_indices = json.load(f)
+
+    return {v: k for k, v in class_indices.items()}
+
+idx_to_class = load_classes()
 
 IMG_SIZE = (100, 100)
 
 # -----------------------------
 # Image Preprocessing
 # -----------------------------
-def preprocess_image(image):
+def preprocess(image):
 
     image = image.convert("RGB")
     image = image.resize(IMG_SIZE)
 
-    img_array = np.array(image).astype("float32")
+    img = np.array(image).astype(np.float32)
 
-    # If your training used rescale=1./255
-    img_array = img_array / 255.0
+    img = img / 255.0
 
-    img_array = np.expand_dims(img_array, axis=0)
+    img = np.expand_dims(img, axis=0)
 
-    return img_array
+    return img
 
 # -----------------------------
-# File Upload
+# Sidebar
 # -----------------------------
-uploaded_file = st.file_uploader(
-    "Upload an image",
+with st.sidebar:
+
+    st.header("Project")
+
+    st.write("Model : MobileNetV2")
+
+    st.write("Input Size : 100 × 100")
+
+    st.write("Classes :", len(idx_to_class))
+
+    st.write("Test Accuracy : 92.78%")
+
+# -----------------------------
+# Upload Image
+# -----------------------------
+uploaded = st.file_uploader(
+    "Upload a fruit image",
     type=["jpg", "jpeg", "png"]
 )
 
-if uploaded_file is not None:
+if uploaded is not None:
 
-    image = Image.open(uploaded_file)
+    image = Image.open(uploaded)
 
-    st.image(image, caption="Uploaded Image", use_container_width=True)
+    col1, col2 = st.columns([1, 1])
 
-    with st.spinner("Predicting..."):
+    with col1:
 
-        img = preprocess_image(image)
+        st.image(
+            image,
+            caption="Uploaded Image",
+            use_container_width=True
+        )
 
-        prediction = model.predict(img, verbose=0)
+    with col2:
 
-        predicted_index = np.argmax(prediction)
+        with st.spinner("Predicting..."):
 
-        confidence = prediction[0][predicted_index] * 100
+            img = preprocess(image)
 
-        predicted_class = idx_to_class[predicted_index]
+            prediction = model.predict(
+                img,
+                verbose=0
+            )[0]
 
-    st.success(f"Prediction: **{predicted_class}**")
+        pred_index = np.argmax(prediction)
 
-    st.write(f"Confidence: **{confidence:.2f}%**")
+        pred_class = idx_to_class[pred_index]
 
-    # -------------------------
-    # Top 5 Predictions
-    # -------------------------
+        confidence = prediction[pred_index] * 100
+
+        st.success(f"Prediction: **{pred_class}**")
+
+        st.metric(
+            "Confidence",
+            f"{confidence:.2f}%"
+        )
+
+        st.progress(float(prediction[pred_index]))
+
+    st.divider()
+
     st.subheader("Top 5 Predictions")
 
-    top5 = np.argsort(prediction[0])[::-1][:5]
+    top5 = np.argsort(prediction)[::-1][:5]
 
-    for idx in top5:
+    for i in top5:
 
-        st.write(
-            f"{idx_to_class[idx]} : {prediction[0][idx]*100:.2f}%"
-        )
+        st.write(f"**{idx_to_class[i]}**")
+
+        st.progress(float(prediction[i]))
+
+        st.write(f"{prediction[i]*100:.2f}%")
+
+st.divider()
+
+st.caption(
+    "Developed using TensorFlow, MobileNetV2 and Streamlit."
+)
